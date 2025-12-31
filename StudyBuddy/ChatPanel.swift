@@ -46,6 +46,8 @@ struct ChatPanel: View {
         ConfigManager.shared.chatBubbleMaxWidth
     }
 
+    private let maxVisibleReferencePages: Int = 5
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             let shouldShowConversation = !chatMessages.isEmpty || !newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading
@@ -92,21 +94,30 @@ struct ChatPanel: View {
 
                                     // Show references for user messages when using RAG
                                     if message.isUser && !message.references.isEmpty {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("📄 Pages:")
-                                                .font(.caption)
+                                        let refs = message.references
+                                        let visibleRefs = Array(refs.prefix(maxVisibleReferencePages))
+                                        let remainingCount = max(0, refs.count - visibleRefs.count)
+
+                                        VStack(alignment: .trailing, spacing: 4) {
+                                            Text("📄 Pages")
+                                                .font(.caption2)
                                                 .foregroundColor(.secondary)
-                                            HStack(spacing: 4) {
-                                                ForEach(message.references.prefix(ConfigManager.shared.maxPagesDisplay)) { ref in
+
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                ForEach(visibleRefs) { ref in
                                                     Text("Page \(ref.pageNumber)")
-                                                        .font(.caption)
-                                                        .padding(.horizontal, 8)
-                                                        .padding(.vertical, 4)
-                                                        .background(Color.blue.opacity(0.1))
-                                                        .cornerRadius(4)
+                                                        .font(.caption2)
+                                                        .foregroundColor(.secondary)
+                                                }
+
+                                                if remainingCount > 0 {
+                                                    Text("+\(remainingCount) more")
+                                                        .font(.caption2)
+                                                        .foregroundColor(.secondary)
                                                 }
                                             }
                                         }
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
                                         .padding(.horizontal, 12)
                                     }
                                 }
