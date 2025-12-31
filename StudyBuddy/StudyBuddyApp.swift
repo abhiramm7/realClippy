@@ -1,14 +1,11 @@
-//
-//  StudyBuddyApp.swift
-//  StudyBuddy
-//
-//  Created by Abhiram Mullapudi on 12/31/25.
-//
+
 
 import SwiftUI
 
 @main
 struct StudyBuddyApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

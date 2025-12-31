@@ -1,0 +1,52 @@
+{
+  "defaults": {
+    "ollamaChatModel": "ministral-3:3b",
+    "ollamaBaseURL": "http://localhost:11434",
+    "useRAG": true,
+    "chatTimeout": 20.0
+  },
+  "ui": {
+    "defaultChatWidth": 300,
+    "showWelcomeMessage": true,
+    "autoIndexOnOpen": true,
+    "fastMode": true,
+    "maxChatHistoryMessages": 6
+  },
+  "search": {
+    "caseSensitive": false,
+    "wholeWords": false,
+    "maxResultsPerPage": 10,
+    "contextLines": 2,
+    "highlightMatches": true
+  },
+  "rag": {
+    "enableAutoIndexing": true,
+    "showPageNumbers": true,
+    "maxPagesDisplay": 100,
+    "includePageContext": true,
+    "maxContextChars": 300,
+    "minRelevantSnippetsBeforeStop": 5
+  },
+  "ollamaOptions": {
+    "chat": {
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "num_predict": 256
+    },
+    "keywords": {
+      "temperature": 0.8,
+      "top_p": 0.95,
+      "num_predict": 96
+    },
+    "relevance": {
+      "temperature": 0.0,
+      "top_p": 0.5,
+      "num_predict": 48
+    }
+  },
+  "models": {
+    "recommendedChat": [
+      "ministral-3:3b"
+    ]
+  }
+}
