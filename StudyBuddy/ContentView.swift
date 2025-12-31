@@ -73,7 +73,6 @@ struct ContentView: View {
     @StateObject private var chatService = ChatService()
     @StateObject private var searchService = TextSearchService()
 
-    
     var body: some View {
         VStack(spacing: 0) {
             headerBar
@@ -216,24 +215,24 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                     .help(isSearchVisible ? "Hide search results" : "Show search results")
-                }
 
-                Button(action: {
-                    isSettingsVisible.toggle()
-                }) {
-                    Image(systemName: "gearshape")
-                        .imageScale(.large)
-                        .foregroundColor(.accentColor)
-                        .padding(.trailing, 4)
+                    Button(action: {
+                        isSettingsVisible.toggle()
+                    }) {
+                        Image(systemName: "gearshape")
+                            .imageScale(.large)
+                            .foregroundColor(.accentColor)
+                            .padding(.trailing, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $isSettingsVisible) {
+                        SettingsPopover(
+                            ollamaModel: $ollamaModel,
+                            useRAG: $useRAG
+                        )
+                    }
+                    .help("Settings")
                 }
-                .buttonStyle(.plain)
-                .popover(isPresented: $isSettingsVisible) {
-                    SettingsPopover(
-                        ollamaModel: $ollamaModel,
-                        useRAG: $useRAG
-                    )
-                }
-                .help("Settings")
             }
         }
         .padding(.horizontal, 16)
@@ -370,6 +369,10 @@ struct ContentView: View {
     private func setDocumentMeta(from url: URL) {
         docTitle = url.lastPathComponent
         print("📄 Loading PDF: \(url.lastPathComponent)")
+
+        // Clear search state on new document
+        searchQuery = ""
+        clearPDFKitSearch()
 
         var attempts = 0
         func tryIndexPDF() {
