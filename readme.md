@@ -4,6 +4,34 @@ A macOS PDF reader that pairs your textbook/research paper with a local Ollama c
 
 ---
 
+## Share this app (GitHub Pages + DMG)
+
+### GitHub Pages site
+
+This repo includes a GitHub Pages site in `docs/`.
+
+To enable it:
+1. GitHub → **Settings** → **Pages**
+2. Source: **Deploy from a branch**
+3. Branch: `main`
+4. Folder: `/docs`
+
+### DMG for others to install
+
+A simple DMG builder script is included:
+
+```bash
+chmod +x scripts/build_dmg.sh
+./scripts/build_dmg.sh
+```
+
+It produces:
+- `dist/StudyBuddy.dmg`
+
+Upload that DMG to **GitHub Releases** so others can download it.
+
+---
+
 ## Quick health checks (Ollama)
 
 ### 1) Check Ollama is running
