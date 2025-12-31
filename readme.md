@@ -1,121 +1,98 @@
-# StudyBuddy (PDF Reader + Ollama Chat)
+# StudyBuddy
 
-A macOS PDF reader that pairs your textbook/research paper with a local Ollama chatbot. The goal is a “study buddy” experience: ask questions, get answers grounded in the PDF.
+A macOS PDF reader with a built-in chat assistant powered by a **local Ollama model**.
+
+Use it to:
+- Open a PDF (textbook/paper)
+- Search inside the PDF (PDFKit)
+- Ask questions in chat
+- Optionally highlight text in the PDF to use *that exact selection* as chat context
 
 ---
 
-## Share this app (GitHub Pages + DMG)
+## Requirements
 
-### GitHub Pages site
+- macOS
+- [Ollama](https://ollama.com) installed and running
 
-This repo includes a GitHub Pages site in `docs/`.
+---
 
-To enable it:
-1. GitHub → **Settings** → **Pages**
-2. Source: **Deploy from a branch**
-3. Branch: `main`
-4. Folder: `/docs`
+## Download or Build
 
-### DMG for others to install
+### Use the pre-built DMG (recommended)
 
-A simple DMG builder script is included:
+If a `dist/StudyBuddy.dmg` file is present in this repository or a GitHub Release, you can install the app without building:
+
+- Download the DMG from the `dist/` folder: https://github.com/abhiramm7/realClippy/blob/main/dist/StudyBuddy.dmg
+- Open the DMG and drag `StudyBuddy` to the `Applications` folder.
+
+
+### Or build from source
+
+See below for Ollama setup and build instructions if you want to build it yourself.
+
+---
+
+## Setup (Ollama)
+
+### 1) Install Ollama
+
+Download and install from:
+- https://ollama.com
+
+### 2) Start Ollama
+
+After installation, Ollama runs locally and exposes an HTTP API at:
+- `http://localhost:11434`
+
+Quick check:
 
 ```bash
-chmod +x scripts/build_dmg.sh
-./scripts/build_dmg.sh
-```
-
-It produces:
-- `dist/StudyBuddy.dmg`
-
-Upload that DMG to **GitHub Releases** so others can download it.
-
----
-
-## Quick health checks (Ollama)
-
-### 1) Check Ollama is running
-
-```shell
 curl -sS http://localhost:11434/api/version | cat
 ```
 
-### 2) List installed models
+### 3) Download the default model
 
-```shell
-curl -sS http://localhost:11434/api/tags | cat
+This app’s default chat model is configured in `StudyBuddy/config.json`:
+- `defaults.ollamaChatModel`: `ministral-3:3b`
+
+Pull it:
+
+```bash
+ollama pull ministral-3:3b
 ```
 
-### 3) Smoke-test the chat model (non-stream)
+(Optional) list installed models:
 
-```shell
-curl -sS http://localhost:11434/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "ministral-3:3b",
-    "messages": [{"role":"user","content":"Reply with exactly: OK"}],
-    "stream": false
-  }' | cat
+```bash
+ollama list
 ```
 
-> Note: the app uses streaming (`stream: true`) in `ChatService.swift`, but the non-stream call above is the simplest “is it working?” check.
+---
+
+## Run / Build
+
+### Open in Xcode
+
+```bash
+open StudyBuddy.xcodeproj
+```
+
+### Build from CLI
+
+```bash
+xcodebuild -project StudyBuddy.xcodeproj \
+  -scheme StudyBuddy \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  build
+```
 
 ---
 
-## How the app talks to Ollama (code pointers)
+## Configuration
 
-- `ConfigManager.swift`
-  - `ollamaBaseURL` (default: `http://localhost:11434`)
-  - `ollamaChatModel` (default: `ministral-3:3b`)
-  - request timeout (`chatTimeout`)
-- `ChatService.swift`
-  - `POST /api/chat` with `stream: true`
-  - parses newline-delimited JSON chunks (`done`, `message.content`)
-  - injects a system prompt + optional `<context>...</context>`
+Defaults live in:
+- `StudyBuddy/config.json`
 
----
-
-## Build log (turn this into the blog later)
-
-Use this section as your daily development journal. When you’re ready to publish, you can copy/paste the best entries into a polished blog post.
-
-### 2025-12-31
-
-**What I built / changed**
-- Verified Ollama is reachable locally (`/api/version`).
-- Verified installed models include `ministral-3:3b`.
-- Confirmed `/api/chat` returns a response via `curl`.
-
-**What worked**
-- ✅ `POST /api/chat` returned `OK` in a minimal test.
-
-**What didn’t / gotchas**
-- On macOS, `timeout` isn’t available by default in zsh. If needed for streaming tests, use `gtimeout` (coreutils) or just test using non-stream.
-
-**Next steps**
-- Add UI to choose model + show when Ollama is offline.
-- Improve RAG: better snippet selection, more context characters, citations that jump to pages.
-
----
-
-## Blog draft outline
-
-Working title: **“Building a macOS PDF Study Buddy with SwiftUI, PDFKit, and Ollama”**
-
-1. Motivation: why a local-first “study buddy”
-2. Architecture overview
-   - SwiftUI UI + PDFKit
-   - Text extraction + search/index
-   - RAG: choosing context snippets
-   - Streaming chat from Ollama
-3. Implementation notes
-   - Handling streaming JSON chunks
-   - Prompt design & context formatting (`<context>...</context>`)
-   - Performance + UX tradeoffs (fast mode)
-4. Lessons learned
-   - Latency, model choice, prompt size limits
-   - PDF text extraction quirks
-5. What’s next
-   - Better citations + page navigation
-   - Embeddings + semantic search
-   - Summarization / flashcards
+You can also override values in-app via **Settings** (gear icon).
