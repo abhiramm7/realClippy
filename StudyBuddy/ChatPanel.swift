@@ -42,6 +42,10 @@ struct ChatPanel: View {
     var sendMessage: () -> Void
     var stopMessage: () -> Void
 
+    private var bubbleMaxWidth: CGFloat {
+        ConfigManager.shared.chatBubbleMaxWidth
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             let shouldShowConversation = !chatMessages.isEmpty || !newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading
@@ -75,13 +79,13 @@ struct ChatPanel: View {
                                                 .padding(12)
                                                 .background(Color.accentColor.opacity(0.15))
                                                 .cornerRadius(16)
-                                                .frame(maxWidth: 300, alignment: .trailing)
+                                                .frame(maxWidth: bubbleMaxWidth, alignment: .trailing)
                                         } else {
                                             MultilineText(message.text, isMarkdown: true)
                                                 .padding(12)
                                                 .background(Color.gray.opacity(0.1))
                                                 .cornerRadius(16)
-                                                .frame(maxWidth: 300, alignment: .leading)
+                                                .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
                                             Spacer()
                                         }
                                     }
@@ -117,7 +121,7 @@ struct ChatPanel: View {
                                         .padding(12)
                                         .background(Color.gray.opacity(0.1))
                                         .cornerRadius(16)
-                                        .frame(maxWidth: 300, alignment: .leading)
+                                        .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
                                     Spacer()
                                 }
                                 .padding(.horizontal)

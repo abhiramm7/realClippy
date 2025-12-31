@@ -7,6 +7,13 @@
   },
   "ui": {
     "defaultChatWidth": 300,
+    "minChatWidth": 240,
+    "maxChatWidthFraction": 0.7,
+    "chatBubbleMaxWidth": 320,
+    "settingsPopoverWidth": 420,
+    "pdfIndexMaxAttempts": 10,
+    "pdfIndexRetryBaseDelaySeconds": 0.1,
+
     "showWelcomeMessage": true,
     "autoIndexOnOpen": true,
     "fastMode": true,

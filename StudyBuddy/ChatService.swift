@@ -1,8 +1,6 @@
 //
 //  ChatService.swift
-//  punugu reader
-//
-//  Updated for punugu reader.
+//  StudyBuddy
 //
 
 import Foundation
@@ -10,7 +8,7 @@ import Combine
 import SwiftUI
 
 let systemPrompt = """
-You are the AI assistant inside punugu reader, a macOS app for reading PDFs, especially textbooks and research papers.
+You are the AI assistant inside StudyBuddy, a macOS app for reading PDFs, especially textbooks and research papers.
 
 Your main job is to help the user understand and work with the PDF they have open:
 - Answer questions about the document’s content (definitions, explanations, theorems, proofs, examples, figures, tables, etc.).

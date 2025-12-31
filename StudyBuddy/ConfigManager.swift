@@ -31,6 +31,18 @@ class ConfigManager {
             /// Max number of chat messages (excluding system prompt) to send with each request.
             /// Lower values keep prompts smaller and speed up responses.
             let maxChatHistoryMessages: Int?
+
+            // New UI tuning knobs
+            let minChatWidth: Double?
+            let maxChatWidthFraction: Double?
+            let chatBubbleMaxWidth: Double?
+
+            // Settings popover sizing
+            let settingsPopoverWidth: Double?
+
+            // PDF indexing retry behavior
+            let pdfIndexMaxAttempts: Int?
+            let pdfIndexRetryBaseDelaySeconds: Double?
         }
 
         struct SearchSettings: Codable {
@@ -94,7 +106,13 @@ class ConfigManager {
                     showWelcomeMessage: true,
                     autoIndexOnOpen: true,
                     fastMode: true,
-                    maxChatHistoryMessages: 10
+                    maxChatHistoryMessages: 10,
+                    minChatWidth: 240,
+                    maxChatWidthFraction: 0.7,
+                    chatBubbleMaxWidth: 300,
+                    settingsPopoverWidth: 360,
+                    pdfIndexMaxAttempts: 10,
+                    pdfIndexRetryBaseDelaySeconds: 0.1
                 ),
                 search: Config.SearchSettings(
                     caseSensitive: false,
@@ -163,7 +181,10 @@ class ConfigManager {
     }
 
     var ollamaBaseURL: String {
-        config?.defaults.ollamaBaseURL ?? "http://localhost:11434"
+        if let userURL = UserDefaults.standard.string(forKey: "ollamaBaseURL") {
+            return userURL
+        }
+        return config?.defaults.ollamaBaseURL ?? "http://localhost:11434"
     }
 
     var useRAG: Bool {
@@ -171,7 +192,11 @@ class ConfigManager {
     }
 
     var chatTimeout: Double {
-        config?.defaults.chatTimeout ?? 60.0
+        if UserDefaults.standard.object(forKey: "chatTimeout") != nil {
+            let v = UserDefaults.standard.double(forKey: "chatTimeout")
+            return max(1.0, v)
+        }
+        return config?.defaults.chatTimeout ?? 60.0
     }
 
     var defaultChatWidth: CGFloat {
@@ -183,7 +208,10 @@ class ConfigManager {
     }
 
     var autoIndexOnOpen: Bool {
-        config?.ui.autoIndexOnOpen ?? true
+        if let v = UserDefaults.standard.object(forKey: "autoIndexOnOpen") as? Bool {
+            return v
+        }
+        return config?.ui.autoIndexOnOpen ?? true
     }
 
     /// Fast Mode trades some answer quality for much lower latency.
@@ -202,6 +230,82 @@ class ConfigManager {
             return max(1, v)
         }
         return max(1, config?.ui.maxChatHistoryMessages ?? 10)
+    }
+
+    var maxPagesDisplay: Int {
+        if let v = UserDefaults.standard.object(forKey: "maxPagesDisplay") as? Int {
+            return max(1, v)
+        }
+        return config?.rag.maxPagesDisplay ?? 10
+    }
+
+    var includePageContext: Bool {
+        if let v = UserDefaults.standard.object(forKey: "includePageContext") as? Bool {
+            return v
+        }
+        return config?.rag.includePageContext ?? true
+    }
+
+    var maxRAGContextChars: Int {
+        if let v = UserDefaults.standard.object(forKey: "maxRAGContextChars") as? Int {
+            return max(0, v)
+        }
+        return config?.rag.maxContextChars ?? 4000
+    }
+
+    var minRelevantSnippetsBeforeStop: Int {
+        if let v = UserDefaults.standard.object(forKey: "minRelevantSnippetsBeforeStop") as? Int {
+            return max(1, v)
+        }
+        return config?.rag.minRelevantSnippetsBeforeStop ?? 5
+    }
+
+    // UI tuning overrides
+    var minChatWidth: CGFloat {
+        if UserDefaults.standard.object(forKey: "minChatWidth") != nil {
+            let v = UserDefaults.standard.double(forKey: "minChatWidth")
+            return CGFloat(max(100.0, v))
+        }
+        return CGFloat(config?.ui.minChatWidth ?? 240)
+    }
+
+    var maxChatWidthFraction: CGFloat {
+        if UserDefaults.standard.object(forKey: "maxChatWidthFraction") != nil {
+            let v = UserDefaults.standard.double(forKey: "maxChatWidthFraction")
+            return CGFloat(min(max(0.1, v), 0.95))
+        }
+        return CGFloat(config?.ui.maxChatWidthFraction ?? 0.7)
+    }
+
+    var chatBubbleMaxWidth: CGFloat {
+        if UserDefaults.standard.object(forKey: "chatBubbleMaxWidth") != nil {
+            let v = UserDefaults.standard.double(forKey: "chatBubbleMaxWidth")
+            return CGFloat(max(150.0, v))
+        }
+        return CGFloat(config?.ui.chatBubbleMaxWidth ?? 300)
+    }
+
+    var settingsPopoverWidth: CGFloat {
+        if UserDefaults.standard.object(forKey: "settingsPopoverWidth") != nil {
+            let v = UserDefaults.standard.double(forKey: "settingsPopoverWidth")
+            return CGFloat(max(260.0, v))
+        }
+        return CGFloat(config?.ui.settingsPopoverWidth ?? 360)
+    }
+
+    var pdfIndexMaxAttempts: Int {
+        if let v = UserDefaults.standard.object(forKey: "pdfIndexMaxAttempts") as? Int {
+            return max(1, v)
+        }
+        return max(1, config?.ui.pdfIndexMaxAttempts ?? 10)
+    }
+
+    var pdfIndexRetryBaseDelaySeconds: Double {
+        if UserDefaults.standard.object(forKey: "pdfIndexRetryBaseDelaySeconds") != nil {
+            let v = UserDefaults.standard.double(forKey: "pdfIndexRetryBaseDelaySeconds")
+            return max(0.0, v)
+        }
+        return max(0.0, config?.ui.pdfIndexRetryBaseDelaySeconds ?? 0.1)
     }
 
     // Search settings
@@ -234,22 +338,6 @@ class ConfigManager {
         config?.rag.showPageNumbers ?? true
     }
 
-    var maxPagesDisplay: Int {
-        config?.rag.maxPagesDisplay ?? 10
-    }
-
-    var includePageContext: Bool {
-        config?.rag.includePageContext ?? true
-    }
-
-    var maxRAGContextChars: Int {
-        config?.rag.maxContextChars ?? 4000
-    }
-
-    var minRelevantSnippetsBeforeStop: Int {
-        config?.rag.minRelevantSnippetsBeforeStop ?? 5
-    }
-
     // MARK: - Helpers
 
     func saveOllamaModel(_ model: String) {
@@ -262,8 +350,32 @@ class ConfigManager {
         UserDefaults.standard.set(model, forKey: "ollamaChatModel")
     }
 
-    func saveUseRAG(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: "useRAG")
+    func saveOllamaBaseURL(_ url: String) {
+        UserDefaults.standard.set(url, forKey: "ollamaBaseURL")
+    }
+
+    func saveChatTimeout(_ seconds: Double) {
+        UserDefaults.standard.set(max(1.0, seconds), forKey: "chatTimeout")
+    }
+
+    func saveAutoIndexOnOpen(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "autoIndexOnOpen")
+    }
+
+    func saveMaxPagesDisplay(_ value: Int) {
+        UserDefaults.standard.set(max(1, value), forKey: "maxPagesDisplay")
+    }
+
+    func saveIncludePageContext(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "includePageContext")
+    }
+
+    func saveMaxRAGContextChars(_ value: Int) {
+        UserDefaults.standard.set(max(0, value), forKey: "maxRAGContextChars")
+    }
+
+    func saveMinRelevantSnippetsBeforeStop(_ value: Int) {
+        UserDefaults.standard.set(max(1, value), forKey: "minRelevantSnippetsBeforeStop")
     }
 
     func saveFastMode(_ enabled: Bool) {
@@ -272,6 +384,34 @@ class ConfigManager {
 
     func saveMaxChatHistoryMessages(_ limit: Int) {
         UserDefaults.standard.set(max(1, limit), forKey: "maxChatHistoryMessages")
+    }
+
+    func saveMinChatWidth(_ value: Double) {
+        UserDefaults.standard.set(max(100.0, value), forKey: "minChatWidth")
+    }
+
+    func saveMaxChatWidthFraction(_ value: Double) {
+        UserDefaults.standard.set(min(max(0.1, value), 0.95), forKey: "maxChatWidthFraction")
+    }
+
+    func saveChatBubbleMaxWidth(_ value: Double) {
+        UserDefaults.standard.set(max(150.0, value), forKey: "chatBubbleMaxWidth")
+    }
+
+    func saveSettingsPopoverWidth(_ value: Double) {
+        UserDefaults.standard.set(max(260.0, value), forKey: "settingsPopoverWidth")
+    }
+
+    func savePDFIndexMaxAttempts(_ value: Int) {
+        UserDefaults.standard.set(max(1, value), forKey: "pdfIndexMaxAttempts")
+    }
+
+    func savePDFIndexRetryBaseDelaySeconds(_ value: Double) {
+        UserDefaults.standard.set(max(0.0, value), forKey: "pdfIndexRetryBaseDelaySeconds")
+    }
+
+    func saveUseRAG(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "useRAG")
     }
 
     var recommendedChatModels: [String] {

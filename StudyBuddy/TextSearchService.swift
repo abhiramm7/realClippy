@@ -35,8 +35,6 @@ class TextSearchService: ObservableObject {
     private let relevanceDecisionCache = RelevanceDecisionCache()
 
     /// Lightweight snapshot of relevant configuration values.
-    /// This avoids needing to resolve ConfigManager directly in this file
-    /// while still keeping the logic driven by shared app settings.
     private struct LocalConfig {
         let searchContextLines: Int
         let searchCaseSensitive: Bool
@@ -54,58 +52,22 @@ class TextSearchService: ObservableObject {
     }
 
     /// Lazily materialized local config snapshot from ConfigManager.shared.
-    /// If ConfigManager is not available for some reason, sensible defaults are used.
     private var config: LocalConfig {
-        if let managerType = NSClassFromString("ConfigManager") as? NSObject.Type,
-           let manager = managerType.value(forKey: "shared") as? NSObject {
-            // Best-effort dynamic lookup; if it fails we fall back to defaults below.
-            let baseURL = manager.value(forKey: "ollamaBaseURL") as? String ?? "http://localhost:11434"
-            let model   = manager.value(forKey: "ollamaChatModel") as? String ?? "ministral-3:3b"
-            let ctxLines = manager.value(forKey: "searchContextLines") as? Int ?? 2
-            let caseSensitive = manager.value(forKey: "searchCaseSensitive") as? Bool ?? false
-            let wholeWords = manager.value(forKey: "searchWholeWords") as? Bool ?? false
-            let maxPages = manager.value(forKey: "maxPagesDisplay") as? Int ?? 10
-            let includeContext = manager.value(forKey: "includePageContext") as? Bool ?? true
-            let maxChars = manager.value(forKey: "maxRAGContextChars") as? Int ?? 4000
-            let minSnippets = manager.value(forKey: "minRelevantSnippetsBeforeStop") as? Int ?? 5
-            let fastMode = manager.value(forKey: "fastMode") as? Bool ?? true
-
-            let chatOpts = manager.value(forKeyPath: "ollamaOptions.chat") as? [String: Any] ?? [:]
-            let keywordOpts = manager.value(forKeyPath: "ollamaOptions.keywords") as? [String: Any] ?? [:]
-            let relevanceOpts = manager.value(forKeyPath: "ollamaOptions.relevance") as? [String: Any] ?? [:]
-
-            return LocalConfig(
-                searchContextLines: ctxLines,
-                searchCaseSensitive: caseSensitive,
-                searchWholeWords: wholeWords,
-                maxPagesDisplay: maxPages,
-                includePageContext: includeContext,
-                maxRAGContextChars: maxChars,
-                minRelevantSnippetsBeforeStop: minSnippets,
-                ollamaBaseURL: baseURL,
-                ollamaChatModel: model,
-                chatOptions: chatOpts,
-                keywordOptions: keywordOpts,
-                relevanceOptions: relevanceOpts,
-                fastMode: fastMode
-            )
-        }
-
-        // Fallback defaults if ConfigManager isn't resolved
+        let manager = ConfigManager.shared
         return LocalConfig(
-            searchContextLines: 2,
-            searchCaseSensitive: false,
-            searchWholeWords: false,
-            maxPagesDisplay: 10,
-            includePageContext: true,
-            maxRAGContextChars: 4000,
-            minRelevantSnippetsBeforeStop: 5,
-            ollamaBaseURL: "http://localhost:11434",
-            ollamaChatModel: "ministral-3:3b",
-            chatOptions: [:],
-            keywordOptions: [:],
-            relevanceOptions: [:],
-            fastMode: true
+            searchContextLines: manager.searchContextLines,
+            searchCaseSensitive: manager.searchCaseSensitive,
+            searchWholeWords: manager.searchWholeWords,
+            maxPagesDisplay: manager.maxPagesDisplay,
+            includePageContext: manager.includePageContext,
+            maxRAGContextChars: manager.maxRAGContextChars,
+            minRelevantSnippetsBeforeStop: manager.minRelevantSnippetsBeforeStop,
+            ollamaBaseURL: manager.ollamaBaseURL,
+            ollamaChatModel: manager.ollamaChatModel,
+            chatOptions: manager.ollamaOptionsDictionary(for: .chat),
+            keywordOptions: manager.ollamaOptionsDictionary(for: .keywords),
+            relevanceOptions: manager.ollamaOptionsDictionary(for: .relevance),
+            fastMode: manager.fastMode
         )
     }
 
@@ -320,7 +282,7 @@ class TextSearchService: ObservableObject {
             let now = Date()
             if lastOllamaUnreachableLog == nil || now.timeIntervalSince(lastOllamaUnreachableLog!) >= 10 {
                 lastOllamaUnreachableLog = now
-                print("⚠️ \(label): Ollama unreachable at \(baseURL). Start Ollama (default http://localhost:11434) or update Settings. (\(urlError.code.rawValue))")
+                print("⚠️ \(label): Ollama unreachable at \(baseURL). Start Ollama or update Settings. (\(urlError.code.rawValue))")
             }
         default:
             break
