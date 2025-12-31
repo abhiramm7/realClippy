@@ -52,6 +52,14 @@ struct ContentView: View {
     @State private var pdfUrl: URL? = nil
     @State private var pdfView: PDFView? = nil
     @State private var chatWidth: CGFloat = ConfigManager.shared.defaultChatWidth
+
+    // PDFKit search UI state
+    @State private var searchQuery: String = ""
+    @State private var searchResults: [PDFSearchResult] = []
+    @State private var isSearchVisible: Bool = true
+    @State private var selectedSearchResultID: UUID? = nil
+    @State private var searchSidebarWidth: CGFloat = 260
+
     @State private var docTitle: String = ""
     @State private var currentPage: Int = 0
     @State private var totalPages: Int = 0
@@ -83,10 +91,19 @@ struct ContentView: View {
                 } else {
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
+                            // Left search sidebar
+                            if isSearchVisible {
+                                searchSidebar
+                                    .frame(width: min(searchSidebarWidth, max(200, geometry.size.width * 0.45)))
+
+                                Divider()
+                                    .frame(width: 1)
+                            }
+
                             VStack(spacing: 0) {
                                 PDFContainerView(url: $pdfUrl, pdfView: $pdfView)
                             }
-                            .frame(width: geometry.size.width - chatWidth)
+                            .frame(width: geometry.size.width - (isSearchVisible ? searchSidebarWidth : 0) - chatWidth)
                             .layoutPriority(1)
 
                             Divider()
@@ -162,7 +179,7 @@ struct ContentView: View {
     }
 
     private var headerBar: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(docTitle)
                     .font(.subheadline)
@@ -173,9 +190,34 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                 }
             }
+
             Spacer()
 
             if pdfUrl != nil {
+                HStack(spacing: 8) {
+                    TextField("Search in PDF", text: $searchQuery)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .frame(minWidth: 220, idealWidth: 280)
+                        .onSubmit {
+                            performPDFKitSearch()
+                        }
+
+                    Button("Search") {
+                        performPDFKitSearch()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button(action: {
+                        isSearchVisible.toggle()
+                    }) {
+                        Image(systemName: "sidebar.leading")
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .help(isSearchVisible ? "Hide search results" : "Show search results")
+                }
+
                 Button(action: {
                     isSettingsVisible.toggle()
                 }) {
@@ -195,10 +237,117 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 16)
-        .frame(height: 40)
+        .frame(height: 44)
         .background(Color(NSColor.windowBackgroundColor))
     }
-    
+
+    private var searchSidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Search Results")
+                    .font(.headline)
+                Spacer()
+                if !searchResults.isEmpty {
+                    Text("\(searchResults.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            if searchResults.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No results")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("Search uses PDFKit and matches are highlighted in the document.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(12)
+                Spacer()
+            } else {
+                List(selection: $selectedSearchResultID) {
+                    ForEach(searchResults) { result in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Page \(result.pageNumber)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Text(result.snippet)
+                                .font(.callout)
+                                .lineLimit(3)
+                        }
+                        .padding(.vertical, 4)
+                        .tag(result.id)
+                    }
+                }
+                .listStyle(.sidebar)
+                .onChange(of: selectedSearchResultID) {
+                    guard let id = selectedSearchResultID,
+                          let result = searchResults.first(where: { $0.id == id }) else { return }
+                    goToSearchResult(result)
+                }
+            }
+        }
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    private func performPDFKitSearch() {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            clearPDFKitSearch()
+            return
+        }
+        guard let pdfView, let doc = pdfView.document else {
+            clearPDFKitSearch()
+            return
+        }
+
+        let selections = doc.findString(query, withOptions: .caseInsensitive)
+        let results: [PDFSearchResult] = selections.compactMap { sel in
+            guard let page = sel.pages.first else { return nil }
+            let pageNumber = doc.index(for: page) + 1
+
+            // Build a small snippet. PDFSelection.string often contains the match; fall back gracefully.
+            let raw = (sel.string ?? query).trimmingCharacters(in: .whitespacesAndNewlines)
+            let snippet = raw.isEmpty ? query : raw
+
+            return PDFSearchResult(pageNumber: pageNumber, selection: sel, snippet: snippet)
+        }
+
+        searchResults = results
+        selectedSearchResultID = results.first?.id
+
+        // Highlight first result automatically.
+        if let first = results.first {
+            goToSearchResult(first)
+        } else {
+            pdfView.clearSelection()
+        }
+    }
+
+    private func clearPDFKitSearch() {
+        searchResults.removeAll()
+        selectedSearchResultID = nil
+        pdfView?.clearSelection()
+    }
+
+    private func goToSearchResult(_ result: PDFSearchResult) {
+        guard let pdfView else { return }
+
+        // Navigate + highlight using PDFKit.
+        pdfView.setCurrentSelection(result.selection, animate: true)
+        pdfView.scrollSelectionToVisible(nil)
+
+        if let page = result.selection.pages.first {
+            pdfView.go(to: page)
+        }
+    }
+
     private func openPDF() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf]
@@ -266,12 +415,15 @@ struct ContentView: View {
             var contextToUse: String?
             var pages: [Int] = []
 
-            if useRAG {
+            // If the user explicitly highlighted text, use it as the context directly.
+            // Important: do NOT run the PDF text search/RAG pipeline in that case.
+            if let selection = selectedText?.trimmingCharacters(in: .whitespacesAndNewlines), !selection.isEmpty {
+                contextToUse = selection
+                pages = []
+            } else if useRAG {
                 let result = await searchService.getContextForQuery(trimmed)
                 contextToUse = result.context
                 pages = result.pages
-            } else if selectedText?.isEmpty == false {
-                contextToUse = selectedText
             } else {
                 contextToUse = surroundingPages
             }
