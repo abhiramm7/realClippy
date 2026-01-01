@@ -5,34 +5,59 @@ title: StudyBuddy
 
 # StudyBuddy
 
-A macOS PDF reader that pairs your textbook/research paper with a local Ollama chatbot.
+A macOS PDF reader that pairs your textbook / research paper with a **local Ollama** chatbot.
+
+[![StudyBuddy screenshot](screenshot_screenbuddy.png)](screenshot_screenbuddy.png)
 
 ## Download
 
-- **DMG (recommended):** download the latest installer from
-  [GitHub Releases](https://github.com/abhiramm7/realClippy/releases).
+- **DMG (recommended):**
+  https://github.com/abhiramm7/realClippy/blob/main/dist/StudyBuddy.dmg
+  
+  Open the DMG and drag **StudyBuddy** into **Applications**.
 - **Source:** clone this repo and build in Xcode.
 
-## What it does
+## Key features
 
-- Open and read a PDF with PDFKit.
-- Ask questions in the chat panel.
-- Highlight text to use it as context (and skip the slower search pipeline).
-- Search the PDF using PDFKit, with results shown in the left sidebar.
+- Read PDFs with PDFKit.
+- Ask questions in a built-in chat panel.
+- **Highlight text to use it as context** (fastest and most reliable).
+- Search the PDF (PDFKit) and browse results in the left sidebar.
 
 ## Requirements
 
-- macOS + Xcode (to build from source)
-- [Ollama](https://ollama.com) running locally
+- macOS
+- [Ollama](https://ollama.com) installed and running locally
 
-## Quick Ollama checks
+## Setup (Ollama)
+
+1) Verify Ollama is reachable:
 
 ```shell
 curl -sS http://localhost:11434/api/version | cat
-curl -sS http://localhost:11434/api/tags | cat
 ```
 
-## Build & Run
+2) (Recommended) Pull the default model (see `StudyBuddy/config.json`):
+
+```shell
+ollama pull ministral-3:3b
+```
+
+Optional: list installed models
+
+```shell
+ollama list
+```
+
+## Quick start
+
+1) Open any PDF.
+2) Either:
+   - **Highlight text** to anchor your question on a specific passage, or
+   - Use **Search** to find relevant chunks.
+3) Ask your question in the chat panel.
+
+## Build & Run (from source)
 
 ```shell
 # Open the project in Xcode
@@ -59,11 +84,3 @@ This produces:
 ## Notes
 
 - Default Ollama base URL and model are configured in `StudyBuddy/config.json` (overridable in Settings).
-
-## Screenshots
-
-Add screenshots to `docs/assets/` and reference them here, for example:
-
-```markdown
-![Main UI](assets/screenshot-main.png)
-```
