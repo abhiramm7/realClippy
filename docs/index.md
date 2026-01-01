@@ -7,7 +7,10 @@ title: StudyBuddy
 
 A macOS PDF reader that pairs your textbook / research paper with a **local Ollama** chatbot.
 
-[![StudyBuddy screenshot](screenshot_screenbuddy.png)](screenshot_screenbuddy.png)
+<!-- Limit screenshot size on the page, but keep it clickable to the full-resolution image. -->
+<a href="screenshot_screenbuddy.png">
+  <img src="screenshot_screenbuddy.png" alt="StudyBuddy screenshot" style="max-width: 640px; width: 100%; height: auto;" />
+</a>
 
 ## Download
 
