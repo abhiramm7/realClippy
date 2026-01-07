@@ -88,6 +88,10 @@ xcodebuild -project StudyBuddy.xcodeproj \
   build
 ```
 
+```bash
+chmod +x scripts/build_dmg.sh
+./scripts/build_dmg.sh
+```
 ---
 
 ## Configuration
