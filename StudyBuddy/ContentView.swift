@@ -2,6 +2,33 @@ import SwiftUI
 import PDFKit
 import UniformTypeIdentifiers
 
+// MARK: - PDF annotations
+
+enum AnnotationTool: String, CaseIterable, Identifiable {
+    case none
+    case highlight
+    case note
+    case ink
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .none: return "Select"
+        case .highlight: return "Highlight"
+        case .note: return "Note"
+        case .ink: return "Ink"
+        }
+    }
+}
+
+private func unionBounds(of selection: PDFSelection, on page: PDFPage) -> CGRect? {
+    let boxes = selection.selectionsByLine().map { $0.bounds(for: page) }
+    guard var rect = boxes.first else { return nil }
+    for b in boxes.dropFirst() { rect = rect.union(b) }
+    return rect
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openDocument() {
         NotificationCenter.default.post(name: NSNotification.Name("ManualOpenPDF"), object: nil)
@@ -18,6 +45,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct PDFKitViewWithReference: NSViewRepresentable {
     @Binding var url: URL?
     @Binding var pdfView: PDFView?
+    @Binding var annotationTool: AnnotationTool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
@@ -31,6 +63,10 @@ struct PDFKitViewWithReference: NSViewRepresentable {
         // Configure for better search highlighting
         view.highlightedSelections = []
 
+        // Allow PDFKit markup interactions (ink, resize handles, selection-based markup)
+        view.isInMarkupMode = true
+        view.delegate = context.coordinator
+
         DispatchQueue.main.async {
             self.pdfView = view
         }
@@ -39,10 +75,21 @@ struct PDFKitViewWithReference: NSViewRepresentable {
 
     func updateNSView(_ nsView: PDFView, context: Context) {
         if let url = url {
-            nsView.document = PDFDocument(url: url)
+            // Avoid unnecessarily reloading the same document (helps preserve annotation editing state)
+            if nsView.document?.documentURL != url {
+                nsView.document = PDFDocument(url: url)
+            }
         } else {
             nsView.document = nil
         }
+
+        // Toggle markup mode based on tool.
+        // For ink, PDFKit's markup controller will handle drawing when markup mode is enabled.
+        nsView.isInMarkupMode = annotationTool != .none
+    }
+
+    final class Coordinator: NSObject, PDFViewDelegate {
+        // (Optional future hooks: selection changed, clicked annotation, etc.)
     }
 }
 
@@ -69,6 +116,9 @@ struct ContentView: View {
     @State private var surroundingPages: String = ""
     @State private var selectedText: String? = nil
     @State private var useRAG: Bool = ConfigManager.shared.useRAG
+
+    // Annotation UI state
+    @State private var annotationTool: AnnotationTool = .none
 
     @StateObject private var chatService = ChatService()
     @StateObject private var searchService = TextSearchService()
@@ -100,7 +150,7 @@ struct ContentView: View {
                             }
 
                             VStack(spacing: 0) {
-                                PDFContainerView(url: $pdfUrl, pdfView: $pdfView)
+                                PDFContainerView(url: $pdfUrl, pdfView: $pdfView, annotationTool: $annotationTool)
                             }
                             .frame(width: geometry.size.width - (isSearchVisible ? searchSidebarWidth : 0) - chatWidth)
                             .layoutPriority(1)
@@ -194,6 +244,28 @@ struct ContentView: View {
 
             if pdfUrl != nil {
                 HStack(spacing: 8) {
+                    Picker("Annotation Tool", selection: $annotationTool) {
+                        ForEach(AnnotationTool.allCases) { tool in
+                            Text(tool.title).tag(tool)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 320)
+                    .help("Select an annotation tool")
+
+                    Button("Apply") {
+                        applyAnnotationToolToCurrentSelection()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(annotationTool == .none || annotationTool == .ink)
+                    .help("Creates a highlight or note from the selected text")
+
+                    Button("Delete") {
+                        deleteAnnotationsIntersectingSelection()
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Deletes annotations that intersect the current selection")
+
                     TextField("Search in PDF", text: $searchQuery)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .frame(minWidth: 220, idealWidth: 280)
@@ -518,6 +590,64 @@ struct ContentView: View {
     private func stopChat() {
         chatService.cancelStreaming()
         isLoadingResponse = false
+    }
+
+    // MARK: - Annotations actions
+
+    private func applyAnnotationToolToCurrentSelection() {
+        guard let pdfView, let doc = pdfView.document else { return }
+        guard let selection = pdfView.currentSelection, let page = selection.pages.first else { return }
+
+        switch annotationTool {
+        case .none:
+            return
+
+        case .ink:
+            // Ink is handled interactively by PDFKit when markup mode is on.
+            return
+
+        case .highlight:
+            // Split highlights by line for better visuals (and supports multi-line selection).
+            let lineSelections = selection.selectionsByLine()
+            for lineSel in lineSelections {
+                for selPage in lineSel.pages {
+                    let bounds = lineSel.bounds(for: selPage)
+                    guard !bounds.isEmpty else { continue }
+                    let ann = PDFAnnotation(bounds: bounds, forType: .highlight, withProperties: nil)
+                    ann.color = NSColor.systemYellow.withAlphaComponent(0.35)
+                    selPage.addAnnotation(ann)
+                }
+            }
+            pdfView.setNeedsDisplay(pdfView.bounds)
+
+        case .note:
+            guard let bounds = unionBounds(of: selection, on: page) else { return }
+            // A standard note icon is ~24x24 in page units; place at top-left of selection.
+            let noteBounds = CGRect(x: bounds.minX, y: max(bounds.maxY - 24, bounds.minY), width: 24, height: 24)
+            let ann = PDFAnnotation(bounds: noteBounds, forType: .text, withProperties: nil)
+            ann.contents = selection.string?.trimmingCharacters(in: .whitespacesAndNewlines)
+            ann.color = NSColor.systemBlue.withAlphaComponent(0.9)
+            page.addAnnotation(ann)
+            pdfView.setNeedsDisplay(pdfView.bounds)
+        }
+
+        // Keep selection visible after annotating.
+        _ = doc
+        pdfView.scrollSelectionToVisible(nil)
+    }
+
+    private func deleteAnnotationsIntersectingSelection() {
+        guard let pdfView else { return }
+        guard let selection = pdfView.currentSelection, let page = selection.pages.first else { return }
+        guard let bounds = unionBounds(of: selection, on: page) else { return }
+
+        let toRemove = page.annotations.filter { $0.bounds.intersects(bounds) }
+        guard !toRemove.isEmpty else { return }
+
+        for ann in toRemove {
+            page.removeAnnotation(ann)
+        }
+        pdfView.setNeedsDisplay(pdfView.bounds)
     }
 }
 
